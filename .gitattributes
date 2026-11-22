@@ -1,0 +1,6 @@
+# Linux/container scripts must always use Unix LF line endings.
+*.sh text eol=lf
+
+# Container-related configuration should also remain LF.
+*.yaml text eol=lf
+*.yml text eol=lf

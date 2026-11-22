@@ -1,0 +1,26 @@
+Checks: >
+  -*,
+  bugprone-*,
+  clang-analyzer-*,
+  cppcoreguidelines-*,
+  modernize-*,
+  performance-*,
+  readability-*,
+  -modernize-use-trailing-return-type,
+  -cppcoreguidelines-avoid-c-arrays,
+  -modernize-avoid-c-arrays,
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  -cppcoreguidelines-pro-type-const-cast,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
+  -readability-magic-numbers,
+  -cppcoreguidelines-avoid-magic-numbers
+
+WarningsAsErrors: '*'
+
+CheckOptions:
+  - key: readability-function-size.LineThreshold
+    value: '50'
+  - key: readability-function-size.NestingThreshold
+    value: '3'
+  - key: bugprone-reserved-identifier.AllowedIdentifiers
+    value: 'memcpy;memset'
