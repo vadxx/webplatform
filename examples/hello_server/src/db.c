@@ -13,12 +13,11 @@ enum {
 static _Alignas(16) unsigned char g_arena[DB_ARENA_SIZE];
 static int g_sqlite_configured;
 
-static const char DB_SCHEMA[] =
-    "CREATE TABLE IF NOT EXISTS metrics ("
-    "ts INTEGER PRIMARY KEY,"
-    "cpu_busy REAL NOT NULL,"
-    "mem_kb INTEGER NOT NULL,"
-    "load1 REAL NOT NULL)";
+static const char DB_SCHEMA[] = "CREATE TABLE IF NOT EXISTS metrics ("
+                                "ts INTEGER PRIMARY KEY,"
+                                "cpu_busy REAL NOT NULL,"
+                                "mem_kb INTEGER NOT NULL,"
+                                "load1 REAL NOT NULL)";
 
 /* Pragmas: the page cache must fit the static arena with room to spare.
  * Under memsys5 every allocation rounds up to a power of two, so a
@@ -27,9 +26,8 @@ static const char DB_SCHEMA[] =
  * and lets LRU recycle pages once the cap is reached. synchronous=NORMAL
  * costs one fsync-class sync per commit, which keeps the rollback
  * journal survivable across power loss (OFF can corrupt the file). */
-static const char DB_PRAGMAS[] =
-    "PRAGMA cache_size=24;"
-    "PRAGMA synchronous=NORMAL;";
+static const char DB_PRAGMAS[] = "PRAGMA cache_size=24;"
+                                 "PRAGMA synchronous=NORMAL;";
 
 /* sqlite3_config is process-global and one-shot: before initialize,
  * never after. The guard makes repeated db_open calls safe.
@@ -94,8 +92,7 @@ int db_query(struct db *db, const char *sql, db_row_fn row, void *ctx) {
         return -1;
     }
     struct query_trampoline trampoline = {row, ctx};
-    return sqlite3_exec(db->handle, sql, query_trampoline, &trampoline, NULL) == SQLITE_OK ? 0
-                                                                                           : -1;
+    return sqlite3_exec(db->handle, sql, query_trampoline, &trampoline, NULL) == SQLITE_OK ? 0 : -1;
 }
 
 int db_close(struct db *db) {
@@ -105,4 +102,11 @@ int db_close(struct db *db) {
     const int rc = sqlite3_close_v2(db->handle) == SQLITE_OK ? 0 : -1;
     db->handle = NULL;
     return rc;
+}
+
+long db_changes(struct db *db) {
+    if (db == NULL || db->handle == NULL) {
+        return 0;
+    }
+    return sqlite3_changes64(db->handle);
 }

@@ -62,3 +62,9 @@ jobs:
           docker exec smoke sh -c 'curl -sf localhost:8080/htmx.min.js | gunzip | grep -q htmx'
           docker exec smoke sh -c '! curl -sf localhost:8080/plugin/../etc > /dev/null'
           docker exec smoke curl -si localhost:8080/nope | grep -q "404 Not Found"
+          # metrics: first row lands after ~10 s (the first tick is the baseline)
+          sleep 10
+          docker exec smoke curl -sf 'localhost:8080/api/metrics?range=60' | grep -q '"ts":\['
+          docker exec smoke curl -sf 'localhost:8080/api/metrics?range=abc' | grep -q '"cpu":\['
+          docker exec smoke curl -sf --compressed localhost:8080/ | grep -q "metrics-chart"
+          docker exec smoke curl -sf --compressed localhost:8080/uplot.iife.min.js | grep -q uPlot

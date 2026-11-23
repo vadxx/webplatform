@@ -27,18 +27,12 @@ docker logs webplatform               # one-screen hint on every start
 
 ## HTTP port convention
 
-The server listens on `8080` inside the container by default. The
-`WEBPLATFORM_HTTP_PORT` environment variable overrides it end to end: this
-repo's compose passes it into the container, the entrypoint hint prints it
-and the example server (`examples/server`) binds it. Publishing to the host
-is the job of the server repository's compose:
-
-```yaml
-environment:
-  - WEBPLATFORM_HTTP_PORT=${WEBPLATFORM_HTTP_PORT:-8080}
-ports:
-  - "${WEBPLATFORM_HTTP_PORT:-8080}:${WEBPLATFORM_HTTP_PORT:-8080}"
-```
+The server listens on `8080` inside the container by default, and this
+repo's compose publishes the same port to the host, bound to `127.0.0.1`
+only (the examples ship demo passwords, they are not for the LAN). The
+`WEBPLATFORM_HTTP_PORT` environment variable overrides it end to end:
+compose passes it into the container and publishes it, the entrypoint
+hint prints it and the example server (`examples/server`) binds it.
 
 ## Editor
 

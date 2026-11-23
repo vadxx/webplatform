@@ -9,6 +9,7 @@ with the source, version, license and update notes.
 | [htmx/](htmx/) | HTMX for the example frontend | [htmx.org](https://htmx.org) v2.0.4 | BSD 2-Clause |
 | [jsmn/](jsmn/) | header-only JSON tokenizer | [zserge/jsmn](https://github.com/zserge/jsmn) v1.1.0 | MIT |
 | [sqlite/](sqlite/) | SQLite amalgamation | [sqlite.org](https://sqlite.org) 3.54.1 | Public Domain |
+| [uplot/](uplot/) | canvas chart library (metrics widget) | [leeoniya/uPlot](https://github.com/leeoniya/uPlot) 1.6.32 | MIT |
 
 Never edit vendored files - update them wholesale per the per-directory
 notes.

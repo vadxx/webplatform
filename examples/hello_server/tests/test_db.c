@@ -169,4 +169,15 @@ UTEST(db, soak_grows_without_deletes) {
     remove(path);
 }
 
+UTEST(db, changes_counts_rows) {
+    struct db db;
+    char sql[96];
+    ASSERT_EQ(0, db_open(&db, ":memory:"));
+    ASSERT_EQ(0, db_exec(&db, "INSERT INTO metrics VALUES (1, 1.5, 100, 0.5)"));
+    ASSERT_EQ(0, db_exec(&db, "INSERT INTO metrics VALUES (2, 1.5, 100, 0.5)"));
+    ASSERT_EQ(0, db_exec(&db, "DELETE FROM metrics WHERE ts < 3"));
+    ASSERT_EQ((long)2, db_changes(&db));
+    ASSERT_EQ(0, db_close(&db));
+}
+
 UTEST_MAIN();

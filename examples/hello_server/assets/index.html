@@ -3,7 +3,9 @@
 <head>
   <meta charset="utf-8">
   <title>webplatform demo server</title>
+  <link rel="stylesheet" href="/uplot.min.css">
   <script src="/htmx.min.js"></script>
+  <script src="/uplot.iife.min.js"></script>
 </head>
 <body>
   <h1>webplatform demo server</h1>
@@ -12,5 +14,64 @@
     Load fragment from plugin
   </button>
   <div id="fragment"></div>
+
+  <h2>Host metrics</h2>
+  <p id="metrics-status">collecting...</p>
+  <div id="metrics-chart"></div>
+
+  <script>
+    /* Metrics widget: fetches /api/metrics and draws a uPlot chart.
+       The server JSON is already in uPlot's column format. */
+    (() => {
+      'use strict';
+      const REFRESH_MS = 5000;
+      const RANGE_SEC = 3600;
+      const statusEl = document.getElementById('metrics-status');
+      const chartEl = document.getElementById('metrics-chart');
+      let chart = null;
+
+      const opts = {
+        width: 640,
+        height: 240,
+        series: [
+          {label: 'time'},
+          {label: 'cpu %', stroke: '#e45756',
+           value: (u, v) => v == null ? '--' : v.toFixed(1) + '%'},
+          {label: 'mem MB', stroke: '#5b9bd5',
+           value: (u, v) => v == null ? '--' : Math.round(v) + ' MB'},
+          {label: 'load', stroke: '#54b26a',
+           value: (u, v) => v == null ? '--' : v.toFixed(2)},
+        ],
+      };
+
+      async function fetchMetrics() {
+        const response = await fetch('/api/metrics?range=' + RANGE_SEC);
+        if (!response.ok) return null;
+        return response.json();
+      }
+
+      function toColumns(data) {
+        return [data.ts, data.cpu, data.mem.map((kb) => kb / 1024), data.load];
+      }
+
+      async function refresh() {
+        const data = await fetchMetrics();
+        if (data == null || data.ts.length === 0) {
+          statusEl.textContent = 'collecting...';
+          return;
+        }
+        statusEl.textContent = '';
+        const columns = toColumns(data);
+        if (chart == null) {
+          chart = new uPlot(opts, columns, chartEl);
+        } else {
+          chart.setData(columns);
+        }
+      }
+
+      refresh();
+      setInterval(refresh, REFRESH_MS);
+    })();
+  </script>
 </body>
 </html>

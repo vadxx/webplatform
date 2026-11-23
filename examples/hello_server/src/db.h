@@ -25,3 +25,6 @@ int db_query(struct db *db, const char *sql, db_row_fn row, void *ctx);
 
 /* Closes the handle. 0 ok, -1 error. */
 int db_close(struct db *db);
+
+/* Rows changed by the most recent INSERT/UPDATE/DELETE (for logging). */
+long db_changes(struct db *db);
