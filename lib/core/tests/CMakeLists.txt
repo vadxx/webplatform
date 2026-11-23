@@ -11,8 +11,9 @@ target_compile_options(test_uri PRIVATE -Wno-everything -fsanitize=address,undef
 target_link_options(test_uri PRIVATE -fsanitize=address,undefined -Wl,--wrap=malloc)
 add_test(NAME test_uri COMMAND test_uri)
 
-add_executable(test_event_loop test_event_loop.c)
+add_executable(test_event_loop test_event_loop.c ${CMAKE_CURRENT_SOURCE_DIR}/../src/http.c)
 target_include_directories(test_event_loop PRIVATE ${UTEST_INC})
+target_link_libraries(test_event_loop PRIVATE core_lib)
 target_link_libraries(test_event_loop PRIVATE core_headers)
 target_compile_options(test_event_loop PRIVATE -Wno-everything -fsanitize=address,undefined -g)
 target_link_options(test_event_loop PRIVATE -fsanitize=address,undefined -Wl,--wrap=malloc)
@@ -24,6 +25,21 @@ target_link_libraries(test_http PRIVATE core_headers core_lib ${CMAKE_DL_LIBS})
 target_compile_options(test_http PRIVATE -Wno-everything -fsanitize=address,undefined -g)
 target_link_options(test_http PRIVATE -fsanitize=address,undefined)
 add_test(NAME test_http COMMAND test_http)
+
+add_executable(test_log test_log.c)
+target_include_directories(test_log PRIVATE ${UTEST_INC})
+target_link_libraries(test_log PRIVATE core_headers)
+target_compile_options(test_log PRIVATE -Wno-everything -fsanitize=address,undefined -g)
+target_link_options(test_log PRIVATE -fsanitize=address,undefined -Wl,--wrap=malloc)
+add_test(NAME test_log COMMAND test_log)
+
+add_executable(test_session test_session.c)
+target_include_directories(test_session PRIVATE ${UTEST_INC})
+target_link_libraries(test_session PRIVATE core_headers)
+# vendored code does not pass -Werror; tests are not product code
+target_compile_options(test_session PRIVATE -Wno-everything -fsanitize=address,undefined -g)
+target_link_options(test_session PRIVATE -fsanitize=address,undefined -Wl,--wrap=malloc)
+add_test(NAME test_session COMMAND test_session)
 
 add_executable(test_jsmn test_jsmn.c)
 target_include_directories(test_jsmn PRIVATE ${UTEST_INC} ${JSMN_INC})

@@ -28,9 +28,16 @@ static const struct core_http_plugin_route g_plugin_routes[] = {
     {"/plugin/", &g_plugin},
 };
 
+/* Both tables for the router */
+static const struct core_http_routes g_routes = {
+    .assets = g_asset_routes,
+    .asset_count = CORE_ARRAY_LEN(g_asset_routes),
+    .plugins = g_plugin_routes,
+    .plugin_count = CORE_ARRAY_LEN(g_plugin_routes),
+};
+
 static int handle_request(struct core_conn *conn) {
-    return core_http_route(conn, g_asset_routes, CORE_ARRAY_LEN(g_asset_routes), g_plugin_routes,
-                           CORE_ARRAY_LEN(g_plugin_routes));
+    return core_http_route(conn, &g_routes);
 }
 
 int main(void) {
@@ -45,5 +52,9 @@ int main(void) {
         fprintf(stderr, "hello_server: core_listen failed\n");
         return 1;
     }
-    return core_loop_run(listen_fd, g_conns, CONN_POOL_SIZE, handle_request);
+    const struct core_conn_pool pool = {
+        .conns = g_conns,
+        .count = CONN_POOL_SIZE,
+    };
+    return core_loop_run(listen_fd, &pool, handle_request, NULL);
 }
