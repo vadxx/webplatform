@@ -1,0 +1,19 @@
+services:
+  webplatform:
+    image: ghcr.io/vadxx/webplatform:main # prebuilt; --build overrides it locally
+    build:
+      context: .
+      dockerfile: Containerfile
+    container_name: webplatform
+    environment:
+      # HTTP port convention: the entrypoint hint and the example server read it
+      - WEBPLATFORM_HTTP_PORT=${WEBPLATFORM_HTTP_PORT:-8080}
+    volumes:
+    # shared dir
+      - ${HOME}/webplatform-share:/share
+    # data dir - survives rebuilds and restarts
+      - webplatform-data:/data
+    restart: unless-stopped
+
+volumes:
+  webplatform-data:
