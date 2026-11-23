@@ -3,8 +3,8 @@ set -euo pipefail
 
 BUILD_DIR="build"
 
-# Project sources: tracked files only; vendored utest.h is untouched
-mapfile -t sources < <(git ls-files '*.c' '*.cpp' '*.h' '*.hpp' | grep -v 'utest\.h$')
+# Project sources: tracked files only; everything vendored in third-party/ is untouched
+mapfile -t sources < <(git ls-files '*.c' '*.cpp' '*.h' '*.hpp' | grep -v '^third-party/')
 
 echo "=== 1. Formatting ==="
 if ((${#sources[@]})); then

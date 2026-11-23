@@ -55,9 +55,9 @@ Containerfile.
 
 ## Examples
 
-- [examples/plugin](examples/plugin/) - the plugin pattern: `-nostdlib` `.so`
+- [examples/plugin](examples/hello_plugin/) - the plugin pattern: `-nostdlib` `.so`
   loaded via `dlopen` with a `host_api_t`.
-- [examples/server](examples/server/) - a vertical slice: HTTP request ->
+- [examples/server](examples/hello_server/) - a vertical slice: HTTP request ->
   route -> plugin -> `writev` -> embedded HTMX page.
 
 ```bash

@@ -8,7 +8,7 @@ target_link_options(test_plugin PRIVATE -fsanitize=address,undefined -Wl,--wrap=
 add_test(NAME test_plugin COMMAND test_plugin)
 # the test includes hello_plugin.c: generated asset header
 add_dependencies(test_plugin hello_plugin_page_assets)
-target_include_directories(test_plugin PRIVATE ${CMAKE_BINARY_DIR}/examples/plugin/lib)
+target_include_directories(test_plugin PRIVATE ${CMAKE_BINARY_DIR}/examples/hello_plugin/lib)
 
 # Built-artifact test: dlopen + dlsym (.so path comes via env)
 add_executable(test_load test_load.c)

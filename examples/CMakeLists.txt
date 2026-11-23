@@ -1,2 +1,2 @@
-add_subdirectory(plugin)
-add_subdirectory(server)
+add_subdirectory(hello_plugin)
+add_subdirectory(hello_server)
