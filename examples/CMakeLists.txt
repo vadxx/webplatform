@@ -1,1 +1,2 @@
-# Filled in by the examples commit
+add_subdirectory(plugin)
+add_subdirectory(server)

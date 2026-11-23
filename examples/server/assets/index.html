@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>webplatform demo server</title>
+  <script src="/htmx.min.js"></script>
+</head>
+<body>
+  <h1>webplatform demo server</h1>
+  <p>Embedded gzip assets + HTMX fragment from a -nostdlib plugin</p>
+  <button hx-get="/plugin/hello" hx-target="#fragment" hx-swap="innerHTML">
+    Load fragment from plugin
+  </button>
+  <div id="fragment"></div>
+</body>
+</html>

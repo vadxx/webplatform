@@ -1,0 +1,6 @@
+add_library(hello_plugin SHARED hello_plugin.c)
+target_link_libraries(hello_plugin PRIVATE core_headers core_lib)
+include(plugin)
+core_plugin(hello_plugin)
+include(embed_asset)
+core_embed_asset(hello_plugin page ${CMAKE_CURRENT_SOURCE_DIR}/../assets/index.html)
