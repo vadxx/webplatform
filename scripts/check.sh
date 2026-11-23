@@ -2,12 +2,14 @@
 set -euo pipefail
 
 BUILD_DIR="build"
-SO_FRONT="$BUILD_DIR/frontend.so"
-SO_BACK="$BUILD_DIR/backend.so"
+
+# Project sources: tracked files only; vendored utest.h is untouched
+mapfile -t sources < <(git ls-files '*.c' '*.cpp' '*.h' '*.hpp' | grep -v 'utest\.h$')
 
 echo "=== 1. Formatting ==="
-find src lib tests -type f \( -name "*.c" -o -name "*.cpp" -o -name "*.h" -o -name "*.hpp" \) \
-    -exec clang-format -i {} +
+if ((${#sources[@]})); then
+    clang-format -i "${sources[@]}"
+fi
 
 echo "=== 2. Building ==="
 cmake -B "$BUILD_DIR" -G Ninja \
@@ -17,32 +19,37 @@ cmake -B "$BUILD_DIR" -G Ninja \
 ninja -C "$BUILD_DIR"
 
 echo "=== 3. Static Analysis ==="
-clang-tidy -p "$BUILD_DIR" src/*.cpp lib/*.cpp --quiet
+# tidy for production code only: tests with vendored utest.h are excluded
+mapfile -t tidy_srcs < <(printf '%s\n' "${sources[@]}" | grep -v '/tests/' | grep -v '^$' || true)
+if ((${#tidy_srcs[@]})); then
+    clang-tidy -p "$BUILD_DIR" "${tidy_srcs[@]}" --quiet
+fi
 
 echo "=== 4. Running Tests ==="
 ctest --test-dir "$BUILD_DIR" --output-on-failure
 
 echo "=== 5. Auditing ELF Symbols & Dependencies ==="
-if readelf -d "$SO_FRONT" | grep -q "NEEDED"; then
-    echo "ERROR: $SO_FRONT depends on external shared libraries:"
-    readelf -d "$SO_FRONT" | grep "NEEDED"
-    exit 1
-fi
-if llvm-nm -u "$SO_FRONT" | grep -E "malloc|calloc|realloc|free|_Znw|_Zda"; then
-    echo "ERROR: Forbidden heap allocations detected in $SO_FRONT:"
-    llvm-nm -u "$SO_FRONT" | grep -E "malloc|calloc|realloc|free|_Znw|_Zda"
-    exit 1
-fi
-
-if readelf -d "$SO_BACK" | grep -q "NEEDED"; then
-    echo "ERROR: $SO_BACK depends on external shared libraries:"
-    readelf -d "$SO_BACK" | grep "NEEDED"
-    exit 1
-fi
-if llvm-nm -u "$SO_BACK" | grep -E "malloc|calloc|realloc|free|_Znw|_Zda"; then
-    echo "ERROR: Forbidden heap allocations detected in $SO_BACK:"
-    llvm-nm -u "$SO_BACK" | grep -E "malloc|calloc|realloc|free|_Znw|_Zda"
-    exit 1
-fi
+mapfile -t libs < <(find "$BUILD_DIR" -type f -name '*.so')
+for so in "${libs[@]}"; do
+    if readelf -d "$so" | grep -q "NEEDED"; then
+        echo "ERROR: $so depends on external shared libraries:"
+        readelf -d "$so" | grep "NEEDED"
+        exit 1
+    fi
+    if imports=$(llvm-nm -u "$so" | grep -E "alloc|memalign|strdup|free|_Zn|_Zd"); then
+        echo "ERROR: forbidden heap allocations detected in $so:"
+        echo "$imports"
+        exit 1
+    fi
+    # Exports: plugin ABI only (plus linker bookkeeping symbols)
+    if bad_exports=$(readelf --dyn-syms -W "$so" \
+        | awk '$7 != "UND" && $4 ~ /^(FUNC|OBJECT)$/ && NF >= 8 {print $8}' \
+        | grep -vE '^plugin_|^_+(bss_start|edata|end|data_start|data)$'); then
+        echo "ERROR: $so exports non-plugin symbols:"
+        echo "$bad_exports"
+        exit 1
+    fi
+done
+echo "audited ${#libs[@]} shared lib(s)"
 
 echo "=== ALL CHECKS PASSED ==="
