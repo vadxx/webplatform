@@ -62,42 +62,65 @@ static int metrics_rows(struct db *db) {
 
 UTEST(parse, proc_stat_totals) {
     struct collect_stat_sample sample = {0};
-    ASSERT_EQ(0, collect_parse_proc_stat(CORE_SV_BUF(PROC_STAT_FIXTURE, strlen(PROC_STAT_FIXTURE)),
+    ASSERT_EQ(0, collect_parse_proc_stat(CORE_SV_BUF(PROC_STAT_FIXTURE, sizeof(PROC_STAT_FIXTURE)),
                                          &sample));
     ASSERT_EQ((long long)STAT_BUSY, sample.busy);
     ASSERT_EQ((long long)STAT_TOTAL, sample.total);
 }
 
 UTEST(parse, proc_stat_minimal_four_fields) {
+    static const char line[] = "cpu 1 2 3 4\n";
     struct collect_stat_sample sample = {0};
-    ASSERT_EQ(0, collect_parse_proc_stat(CORE_SV("cpu 1 2 3 4\n"), &sample));
+    ASSERT_EQ(0, collect_parse_proc_stat(CORE_SV_BUF(line, sizeof(line)), &sample));
     ASSERT_EQ((long long)6, sample.busy);   /* user + nice + sys */
     ASSERT_EQ((long long)10, sample.total); /* busy + idle */
 }
 
 UTEST(parse, proc_stat_garbage) {
+    static const char garbage[] = "garbage\n";
+    static const char short_stat[] = "cpu 1 2\n";
     struct collect_stat_sample sample = {0};
-    ASSERT_EQ(-1, collect_parse_proc_stat(CORE_SV("garbage\n"), &sample));
-    ASSERT_EQ(-1, collect_parse_proc_stat(CORE_SV("cpu 1 2\n"), &sample));
+    ASSERT_EQ(-1, collect_parse_proc_stat(CORE_SV_BUF(garbage, sizeof(garbage)), &sample));
+    ASSERT_EQ(-1, collect_parse_proc_stat(CORE_SV_BUF(short_stat, sizeof(short_stat)), &sample));
+}
+
+UTEST(parse, stat_view_must_carry_terminator) {
+    /* the view len must include the NUL: a terminator-free view would
+     * let sscanf wander into stale bytes beyond the read length */
+    char buf[64];
+    memset(buf, '9', sizeof(buf));
+    memcpy(buf, "cpu  1 2 3 4 5 6 7 8", 20);
+    struct collect_stat_sample sample = {0};
+    ASSERT_EQ(-1, collect_parse_proc_stat(CORE_SV_BUF(buf, 20), &sample));
+}
+
+UTEST(parse, meminfo_view_must_carry_terminator) {
+    char buf[64];
+    memset(buf, 'x', sizeof(buf));
+    const size_t len = sizeof("MemTotal: 100 kB\nMemAvailable: 50 kB\n") - 1;
+    memcpy(buf, "MemTotal: 100 kB\nMemAvailable: 50 kB\n", len);
+    struct collect_mem_sample sample = {0};
+    ASSERT_EQ(-1, collect_parse_meminfo(CORE_SV_BUF(buf, len), &sample));
 }
 
 UTEST(parse, meminfo_pair) {
     struct collect_mem_sample sample = {0};
     ASSERT_EQ(0, collect_parse_meminfo(
-                     CORE_SV_BUF(PROC_MEMINFO_FIXTURE, strlen(PROC_MEMINFO_FIXTURE)), &sample));
+                     CORE_SV_BUF(PROC_MEMINFO_FIXTURE, sizeof(PROC_MEMINFO_FIXTURE)), &sample));
     ASSERT_EQ((long)MEM_TOTAL_KB, sample.total_kb);
     ASSERT_EQ((long)MEM_AVAIL_KB, sample.avail_kb);
 }
 
 UTEST(parse, meminfo_missing_available) {
+    static const char no_avail[] = "MemTotal: 100 kB\n";
     struct collect_mem_sample sample = {0};
-    ASSERT_EQ(-1, collect_parse_meminfo(CORE_SV("MemTotal: 100 kB\n"), &sample));
+    ASSERT_EQ(-1, collect_parse_meminfo(CORE_SV_BUF(no_avail, sizeof(no_avail)), &sample));
 }
 
 UTEST(parse, loadavg_first) {
     double load1 = 0;
     ASSERT_EQ(0, collect_parse_loadavg(
-                     CORE_SV_BUF(PROC_LOADAVG_FIXTURE, strlen(PROC_LOADAVG_FIXTURE)), &load1));
+                     CORE_SV_BUF(PROC_LOADAVG_FIXTURE, sizeof(PROC_LOADAVG_FIXTURE)), &load1));
     ASSERT_NEAR(0.42, load1, 0.0001);
 }
 

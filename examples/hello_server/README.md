@@ -33,7 +33,7 @@ at `http://localhost:8080`. Logs go to `/data/logs/server.log` on the
 persistent volume (`exec -d` output never reaches `docker logs`).
 
 ```bash
-docker exec -d webplatform sh -c 'cd /data/work/webplatform && mkdir -p /data/logs && build/examples/server/src/hello_server >>/data/logs/server.log 2>&1'
+docker exec -d webplatform sh -c 'cd /data/work/webplatform && mkdir -p /data/logs && build/examples/hello_server/src/hello_server >>/data/logs/server.log 2>&1'
 docker exec webplatform curl -sf localhost:8080/plugin/hello        # -> plugin ok: hello
 docker exec webplatform curl -sf --compressed localhost:8080/     # -> HTML page (gzip decoded)
 docker exec webplatform sh -c 'curl -s localhost:8080/nope | head -1' # -> HTTP/1.1 404 Not Found

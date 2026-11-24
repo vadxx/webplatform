@@ -121,6 +121,10 @@ UTEST(restore, full_table_rejected) {
     }
     const char token[] = "fedcba9876543210fedcba9876543210";
     ASSERT_EQ(0, core_session_restore(token, strlen(token), 3600));
+    /* the slot must stay not-taken: after freeing one slot the token is
+     * still unknown, so the rejected restore registered nothing */
+    core_session_close(tokens[0], strlen(tokens[0]));
+    ASSERT_EQ(0, core_session_valid(token, strlen(token)));
 }
 
 UTEST(restore, expires_with_ttl) {

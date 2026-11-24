@@ -2,6 +2,7 @@
 
 #include <dlfcn.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -99,11 +100,23 @@ static size_t strip_cr(const char *value, size_t len) {
     return len;
 }
 
+/* Headers end at the first blank line: lines after it are body and
+ * must never be parsed as headers (a smuggled Content-Length or Cookie
+ * line in the body would be honoured otherwise). */
+static const char *head_block_end(core_str_view_t req) {
+    for (size_t i = 0; i + 4 <= req.len; ++i) {
+        if (memcmp(req.data + i, "\r\n\r\n", 4) == 0) {
+            return req.data + i + 4;
+        }
+    }
+    return req.data + req.len; /* no blank line yet: scan everything */
+}
+
 /* Finds a header line "name:" (case-insensitive); returns the value
  * start with spaces skipped and writes its length (CR stripped). */
 static const char *header_value(core_str_view_t req, const char *name, size_t *value_len) {
     const char *line = req.data;
-    const char *const end = req.data + req.len;
+    const char *const end = head_block_end(req);
     while (line < end) {
         const char *eol = memchr(line, '\n', (size_t)(end - line));
         if (eol == NULL) {
@@ -132,6 +145,9 @@ int core_http_content_length(core_str_view_t req, size_t *out_len) {
     for (size_t i = 0; i < value_len; ++i) {
         if (value[i] < '0' || value[i] > '9') {
             return -1;
+        }
+        if (parsed > (SIZE_MAX - 9) / 10) {
+            return -1; /* the multiply would wrap: no meaningful length */
         }
         parsed = parsed * 10 + (size_t)(value[i] - '0');
     }
@@ -315,8 +331,9 @@ int core_http_set_cookie(char *head, size_t cap, const struct core_http_cookie_s
     }
     char line[SET_COOKIE_CAP];
     const int written =
-        snprintf(line, sizeof(line), "Set-Cookie: %s=%.*s; Max-Age=%d; HttpOnly; Path=/",
-                 spec->name, (int)spec->value.len, spec->value.data, spec->max_age_sec);
+        snprintf(line, sizeof(line), "Set-Cookie: %s=%.*s; Max-Age=%d; HttpOnly; Path=/%s%s",
+                 spec->name, (int)spec->value.len, spec->value.data, spec->max_age_sec,
+                 spec->extra != NULL ? "; " : "", spec->extra != NULL ? spec->extra : "");
     if (written <= 0 || (size_t)written >= sizeof(line)) {
         return -1;
     }

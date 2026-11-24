@@ -17,7 +17,7 @@ stored in SQLite so they survive process restarts.
 - Sessions hydrate from the database on start - kill the process and
   the browser (or a saved cookie jar) is still logged in
 - `/api/logs` - a ring buffer of the server's own log lines served as
-  JSON behind the gate (best effort: under memory pressure it answers
+  JSON behind the gate (best effort: a busy body pool answers
   `503 busy`)
 - The same metrics pipeline as `examples/server`: `/api/metrics` from
   a timerfd collector into SQLite, drawn by a uPlot chart

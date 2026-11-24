@@ -57,6 +57,7 @@
 
       async function fetchMetrics() {
         const response = await fetch('/api/metrics?range=' + RANGE_SEC);
+        if (response.status === 401) { window.location.href = '/login'; return null; }
         if (!response.ok) return null;
         return response.json();
       }
@@ -94,6 +95,7 @@
 
       async function fetchLogs() {
         const response = await fetch('/api/logs');
+        if (response.status === 401) { window.location.href = '/login'; return null; }
         if (!response.ok) return null;
         return response.json();
       }

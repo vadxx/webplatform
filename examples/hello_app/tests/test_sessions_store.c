@@ -20,6 +20,7 @@ static const char DB_PATH[] = "/tmp/webplatform-test-sessions-store.db";
 static const char TOKEN_ALIVE[] = "0123456789abcdef0123456789abcdef";
 static const char TOKEN_DEAD[] = "fedcba9876543210fedcba9876543210";
 static const char TOKEN_GARBAGE[] = "x'; DROP TABLE metrics;--";
+static const char TOKEN_NONHEX32[] = "0123456789abcdef0123456789abcdez";
 
 /* Row sink: counts rows (values are not inspected) */
 struct count_sink {
@@ -80,6 +81,18 @@ UTEST(sessions_store, garbage_token_rejected_and_db_untouched) {
     ASSERT_EQ(-1, app_sessions_delete(&db, TOKEN_GARBAGE));
     ASSERT_EQ(1, table_exists(&db, "metrics"));
     ASSERT_EQ(1, table_exists(&db, "sessions"));
+    ASSERT_EQ(0, db_query(&db, "SELECT token FROM sessions", count_row, &sink));
+    ASSERT_EQ(0, sink.count);
+    ASSERT_EQ(0, db_close(&db));
+}
+
+UTEST(sessions_store, nonhex_32char_token_rejected) {
+    /* 32 chars but not hex: the character check, not just the length */
+    struct db db;
+    struct count_sink sink = {0};
+    ASSERT_EQ(0, db_reset(&db));
+    ASSERT_EQ(-1, app_sessions_save(&db, TOKEN_NONHEX32, time(NULL) + 3600));
+    ASSERT_EQ(-1, app_sessions_delete(&db, TOKEN_NONHEX32));
     ASSERT_EQ(0, db_query(&db, "SELECT token FROM sessions", count_row, &sink));
     ASSERT_EQ(0, sink.count);
     ASSERT_EQ(0, db_close(&db));

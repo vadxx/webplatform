@@ -70,7 +70,7 @@ jobs:
           docker exec smoke curl -sf --compressed localhost:8080/uplot.iife.min.js | grep -q uPlot
       - name: E2E hello_app check
         run: |
-          docker exec smoke pkill hello_server
+          docker exec smoke pkill hello_server || true
           sleep 1
           docker exec -d -w /data/work/repo smoke build/examples/hello_app/src/hello_app
           sleep 1
@@ -81,7 +81,7 @@ jobs:
           docker exec smoke curl -sf --compressed -b /tmp/jar localhost:8080/ | grep -q log-lines
           docker exec smoke curl -sf -b /tmp/jar localhost:8080/api/logs | grep -q '"lines"'
           # persistence: restart keeps the session
-          docker exec smoke pkill hello_app
+          docker exec smoke pkill hello_app || true
           docker exec -d -w /data/work/repo smoke build/examples/hello_app/src/hello_app
           sleep 1
           docker exec smoke curl -sf --compressed -b /tmp/jar localhost:8080/ | grep -q log-lines

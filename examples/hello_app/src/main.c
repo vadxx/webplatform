@@ -39,7 +39,8 @@ static const char LOGIN_ROUTE[] = "/login";
 static const char LOGOUT_ROUTE[] = "/logout";
 static const char ROOT_ROUTE[] = "/";
 static const char API_PREFIX[] = "/api/";
-static const char COOKIE_NAME[] = "app_session";
+static const char METHOD_GET[] = "GET";
+static const char METHOD_POST[] = "POST";
 static const char LOG_TAG[] = "app";
 static const char BODY_METHOD_NOT_ALLOWED[] = "method not allowed";
 static const char BODY_UNAUTHORIZED[] = "unauthorized";
@@ -89,8 +90,7 @@ static int method_is(core_str_view_t req, const char *want) {
  * callers do not chase a redirect they cannot follow. */
 static int gate_check(struct core_conn *conn, core_str_view_t req, core_str_view_t clean_path,
                       core_str_view_t *token) {
-    (void)clean_path;
-    const int has_cookie = core_http_cookie(req, COOKIE_NAME, token) == 1;
+    const int has_cookie = core_http_cookie(req, app_cookie_name, token) == 1;
     if (has_cookie && core_session_valid(token->data, token->len) == 1) {
         return 1;
     }
@@ -103,10 +103,10 @@ static int gate_check(struct core_conn *conn, core_str_view_t req, core_str_view
 }
 
 static int handle_login(core_str_view_t req, struct core_conn *conn) {
-    if (method_is(req, "POST") == 1) {
+    if (method_is(req, METHOD_POST) == 1) {
         return app_login_serve(conn);
     }
-    if (method_is(req, "GET") == 1) {
+    if (method_is(req, METHOD_GET) == 1) {
         return core_http_serve_asset_route(conn, CORE_SV(LOGIN_ROUTE), &g_login_asset);
     }
     return core_http_serve_status(conn, core_http_status_method_not_allowed,
@@ -118,34 +118,45 @@ static int handle_gated(core_str_view_t req, core_str_view_t path, core_str_view
                         struct core_conn *conn) {
     const core_str_view_t clean = {.data = path.data, .len = core_http_path_only(path)};
     if (core_http_match_exact(clean, ROOT_ROUTE) == 1) {
-        if (method_is(req, "GET") != 1) {
+        if (method_is(req, METHOD_GET) != 1) {
             return core_http_serve_status(conn, core_http_status_method_not_allowed,
                                           BODY_METHOD_NOT_ALLOWED);
         }
         return core_http_serve_asset_route(conn, clean, &g_gated);
     }
     if (core_http_match_exact(clean, LOGOUT_ROUTE) == 1) {
-        if (method_is(req, "POST") != 1) {
+        if (method_is(req, METHOD_POST) != 1) {
             return core_http_serve_status(conn, core_http_status_method_not_allowed,
                                           BODY_METHOD_NOT_ALLOWED);
         }
         return app_logout_serve(conn, token);
     }
     if (core_http_match_exact(clean, METRICS_ROUTE) == 1) {
-        if (method_is(req, "GET") != 1) {
+        if (method_is(req, METHOD_GET) != 1) {
             return core_http_serve_status(conn, core_http_status_method_not_allowed,
                                           BODY_METHOD_NOT_ALLOWED);
         }
         return metrics_serve(&g_db, conn, path);
     }
     if (core_http_match_exact(clean, LOGS_ROUTE) == 1) {
-        if (method_is(req, "GET") != 1) {
+        if (method_is(req, METHOD_GET) != 1) {
             return core_http_serve_status(conn, core_http_status_method_not_allowed,
                                           BODY_METHOD_NOT_ALLOWED);
         }
         return app_logs_serve(conn);
     }
     return core_http_not_found(conn);
+}
+
+/* The public asset paths, matched without serving: non-GET requests to
+ * them must answer 405 instead of silently reading. */
+static int public_asset_requested(core_str_view_t clean) {
+    for (size_t i = 0; i < CORE_ARRAY_LEN(g_public_routes); ++i) {
+        if (core_http_match_exact(clean, g_public_routes[i].path) == 1) {
+            return 1;
+        }
+    }
+    return 0;
 }
 
 static int handle_request(struct core_conn *conn) {
@@ -161,9 +172,13 @@ static int handle_request(struct core_conn *conn) {
         return handle_login(req, conn);
     }
 
-    /* public static assets */
-    if (core_http_serve_asset_route(conn, clean, &g_public) == 0) {
-        return 0;
+    /* public static assets: GET serves, anything else is a 405 */
+    if (public_asset_requested(clean) == 1) {
+        if (method_is(req, METHOD_GET) != 1) {
+            return core_http_serve_status(conn, core_http_status_method_not_allowed,
+                                          BODY_METHOD_NOT_ALLOWED);
+        }
+        return core_http_serve_asset_route(conn, clean, &g_public);
     }
 
     /* everything below is behind the session gate */

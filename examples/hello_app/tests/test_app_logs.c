@@ -39,6 +39,11 @@ UTEST(app_logs, renders_lines_oldest_first) {
     core_log('I', "test", "third line");
     const char *body = serve();
     ASSERT_NE(NULL, body);
+    /* exact structure, prefix-independent: every line is quoted and
+     * comma-separated. The browser does response.json() - one lost
+     * quote and the widget hangs on its placeholder forever. */
+    ASSERT_NE(NULL, strstr(body, "\"]}"));
+    ASSERT_NE(NULL, strstr(body, "\",\""));
     const char *first = strstr(body, "first line");
     const char *second = strstr(body, "second line");
     const char *third = strstr(body, "third line");
@@ -55,6 +60,16 @@ UTEST(app_logs, escapes_quotes_and_backslashes) {
     const char *body = serve();
     ASSERT_NE(NULL, body);
     ASSERT_NE(NULL, strstr(body, "bad \\\"quoted\\\" \\\\ path"));
+}
+
+UTEST(app_logs, escapes_control_characters) {
+    core_log_stderr(0);
+    core_log('I', "test", "two\nlines\tand\rreturn");
+    core_log('I', "test", "ctrl \x01 stop");
+    const char *body = serve();
+    ASSERT_NE(NULL, body);
+    ASSERT_NE(NULL, strstr(body, "two\\nlines\\tand\\rreturn"));
+    ASSERT_NE(NULL, strstr(body, "ctrl \\u0001 stop"));
 }
 
 UTEST(app_logs, json_content_type_and_status) {

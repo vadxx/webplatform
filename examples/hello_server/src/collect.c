@@ -38,8 +38,14 @@ static long long g_last_retention_ts = -1;
 /* One warn line per failed-insert streak, not one per tick */
 static int g_insert_fail_streak;
 
+/* The view must carry its NUL terminator: without it sscanf could
+ * wander past buf.len into stale bytes left by earlier reads. */
+static int parse_args_valid(core_str_view_t buf) {
+    return buf.data != NULL && buf.len > 0 && memchr(buf.data, '\0', buf.len) != NULL;
+}
+
 int collect_parse_proc_stat(core_str_view_t buf, struct collect_stat_sample *out) {
-    if (buf.data == NULL || out == NULL || buf.len == 0) {
+    if (!parse_args_valid(buf) || out == NULL) {
         return -1;
     }
     long long user = 0;
@@ -61,7 +67,7 @@ int collect_parse_proc_stat(core_str_view_t buf, struct collect_stat_sample *out
 }
 
 int collect_parse_meminfo(core_str_view_t buf, struct collect_mem_sample *out) {
-    if (buf.data == NULL || out == NULL || buf.len == 0) {
+    if (!parse_args_valid(buf) || out == NULL) {
         return -1;
     }
     const char *total_line = strstr(buf.data, MEM_TOTAL_KEY);
@@ -79,7 +85,7 @@ int collect_parse_meminfo(core_str_view_t buf, struct collect_mem_sample *out) {
 }
 
 int collect_parse_loadavg(core_str_view_t buf, double *load1) {
-    if (buf.data == NULL || load1 == NULL || buf.len == 0) {
+    if (!parse_args_valid(buf) || load1 == NULL) {
         return -1;
     }
     return sscanf(buf.data, "%lf", load1) == 1 ? 0 : -1;
@@ -97,7 +103,9 @@ int collect_cpu_busy_percent(const struct collect_stat_sample *prev,
 }
 
 /* Reads a whole small /proc file into buf as a NUL-terminated string */
-static int read_proc_file(const char *path, char *buf, size_t cap) {
+/* Reads the whole file into buf (NUL-terminated); returns the byte
+ * count including the NUL - the parser views must carry it - or -1. */
+static ssize_t read_proc_file(const char *path, char *buf, size_t cap) {
     const int fd = open(path, O_RDONLY);
     if (fd < 0) {
         return -1;
@@ -108,7 +116,7 @@ static int read_proc_file(const char *path, char *buf, size_t cap) {
         return -1;
     }
     buf[got] = '\0';
-    return 0;
+    return got + 1;
 }
 
 static long long now_sec(void) {
@@ -162,14 +170,15 @@ static int take_snapshot(struct proc_snapshot *out) {
     char stat_buf[PROC_BUF_CAP];
     char mem_buf[PROC_BUF_CAP];
     char load_buf[64];
-    if (read_proc_file(PROC_STAT_PATH, stat_buf, sizeof(stat_buf)) != 0 ||
-        read_proc_file(PROC_MEMINFO_PATH, mem_buf, sizeof(mem_buf)) != 0 ||
-        read_proc_file(PROC_LOADAVG_PATH, load_buf, sizeof(load_buf)) != 0) {
+    const ssize_t stat_len = read_proc_file(PROC_STAT_PATH, stat_buf, sizeof(stat_buf));
+    const ssize_t mem_len = read_proc_file(PROC_MEMINFO_PATH, mem_buf, sizeof(mem_buf));
+    const ssize_t load_len = read_proc_file(PROC_LOADAVG_PATH, load_buf, sizeof(load_buf));
+    if (stat_len < 0 || mem_len < 0 || load_len < 0) {
         return -1; /* /proc disappeared: skip the tick */
     }
-    if (collect_parse_proc_stat(CORE_SV(stat_buf), &out->stat) != 0 ||
-        collect_parse_meminfo(CORE_SV(mem_buf), &out->mem) != 0 ||
-        collect_parse_loadavg(CORE_SV(load_buf), &out->load1) != 0) {
+    if (collect_parse_proc_stat(CORE_SV_BUF(stat_buf, (size_t)stat_len), &out->stat) != 0 ||
+        collect_parse_meminfo(CORE_SV_BUF(mem_buf, (size_t)mem_len), &out->mem) != 0 ||
+        collect_parse_loadavg(CORE_SV_BUF(load_buf, (size_t)load_len), &out->load1) != 0) {
         return -1;
     }
     return 0;

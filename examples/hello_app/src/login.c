@@ -9,7 +9,7 @@
 #include <time.h>
 
 static const char LOGIN_LOG_TAG[] = "login";
-static const char COOKIE_NAME[] = "app_session";
+const char app_cookie_name[] = "app_session";
 static const char LOGIN_PATH[] = "/login";
 static const char ROOT_PATH[] = "/";
 static const char PASSWORD_FIELD[] = "password";
@@ -39,19 +39,26 @@ int app_login_check(core_str_view_t password) {
                                                                                                 : 0;
 }
 
+/* cookie flags stay in the app layer: core_http_cookie_spec.extra */
+static const char COOKIE_ATTRS[] = "SameSite=Lax";
+
 /* core_http_set_cookie edits the head buffer via strlen and knows nothing
  * of resp bookkeeping: after inserting, the lengths must be recomputed
- * or the client receives a head cut short of the Set-Cookie line. */
+ * or the client receives a head cut short of the Set-Cookie line, and
+ * the loop cuts the connection at total_len. */
 static void refresh_head_lengths(struct core_conn *conn) {
+    const size_t old_head_len = conn->resp.head_len;
     conn->resp.head_len = strlen(conn->resp.head);
     conn->resp.iov[0].iov_len = conn->resp.head_len;
+    conn->resp.total_len += conn->resp.head_len - old_head_len;
 }
 
 static int set_session_cookie(struct core_conn *conn, core_str_view_t value, int max_age_sec) {
     const struct core_http_cookie_spec spec = {
-        .name = COOKIE_NAME,
+        .name = app_cookie_name,
         .value = value,
         .max_age_sec = max_age_sec,
+        .extra = COOKIE_ATTRS,
     };
     return core_http_set_cookie(conn->resp.head, sizeof(conn->resp.head), &spec);
 }
@@ -77,7 +84,7 @@ static void session_revoke(core_str_view_t token) {
 static void close_existing_session(struct core_conn *conn) {
     const core_str_view_t req = CORE_SV_BUF(conn->req_buf, conn->req_len);
     core_str_view_t token = {0};
-    if (core_http_cookie(req, COOKIE_NAME, &token) == 1) {
+    if (core_http_cookie(req, app_cookie_name, &token) == 1) {
         session_revoke(token);
     }
 }

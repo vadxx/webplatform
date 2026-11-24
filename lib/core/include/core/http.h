@@ -64,16 +64,22 @@ int core_http_serve_status(struct core_conn *conn, const char *status, const cha
 /* 302 redirect with an empty body. */
 int core_http_serve_redirect(struct core_conn *conn, const char *location);
 
-/* Set-Cookie attributes; value is a view. */
+/* Set-Cookie attributes; value is a view. extra (may be NULL) is
+ * appended verbatim after Path=/ (e.g. "SameSite=Lax"): the app owns
+ * its cookie flags and validates its own value bytes. */
 struct core_http_cookie_spec {
     const char *name;
     core_str_view_t value;
     int max_age_sec;
+    const char *extra;
 };
 
 /* Appends "Set-Cookie: name=value; Max-Age=N; HttpOnly; Path=/\r\n"
- * before the final blank line of an already composed head. 0 ok,
- * -1 when it does not fit (the head is left untouched). */
+ * (plus extra) before the final blank line of an already composed
+ * head. The head must be NUL-terminated: strlen(head) is the insert
+ * point, and cap must cover the grown string. 0 ok, -1 when it does
+ * not fit or the head is not a composed head (the head is left
+ * untouched). */
 int core_http_set_cookie(char *head, size_t cap, const struct core_http_cookie_spec *spec);
 
 /* --- Routing --- */

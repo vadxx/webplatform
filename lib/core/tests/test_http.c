@@ -193,11 +193,15 @@ UTEST(match, prefix_extracts_tail) {
     ASSERT_EQ(0, strncmp("hello", seg.data, seg.len));
 }
 UTEST(match, prefix_no_match) {
-    ASSERT_EQ(0, core_http_match_prefix(CORE_SV("/other/x"), "/plugin/", NULL));
+    core_str_view_t seg = {.len = 9}; /* sentinel: no match must not touch */
+    ASSERT_EQ(0, core_http_match_prefix(CORE_SV("/other/x"), "/plugin/", &seg));
+    ASSERT_EQ((size_t)9, seg.len);
 }
 UTEST(match, prefix_equal_length_no_tail) {
     /* the prefix itself is not a route: an empty segment is not allowed */
-    ASSERT_EQ(0, core_http_match_prefix(CORE_SV("/plugin/"), "/plugin/", NULL));
+    core_str_view_t seg = {.len = 9};
+    ASSERT_EQ(0, core_http_match_prefix(CORE_SV("/plugin/"), "/plugin/", &seg));
+    ASSERT_EQ((size_t)9, seg.len);
 }
 
 /* Fake plugin tail tag: a constant expression is required in the initializer */
@@ -388,10 +392,14 @@ UTEST(query, param_found) {
     ASSERT_EQ(0, strncmp("3600", val.data, val.len));
 }
 UTEST(query, param_absent) {
-    ASSERT_EQ(0, core_http_query_param(CORE_SV("/api/metrics?other=1"), "range", NULL));
+    core_str_view_t val = {.len = 9}; /* sentinel: absent must not touch */
+    ASSERT_EQ(0, core_http_query_param(CORE_SV("/api/metrics?other=1"), "range", &val));
+    ASSERT_EQ((size_t)9, val.len);
 }
 UTEST(query, param_no_query_string) {
-    ASSERT_EQ(0, core_http_query_param(CORE_SV("/api/metrics"), "range", NULL));
+    core_str_view_t val = {.len = 9};
+    ASSERT_EQ(0, core_http_query_param(CORE_SV("/api/metrics"), "range", &val));
+    ASSERT_EQ((size_t)9, val.len);
 }
 UTEST(query, param_empty_value) {
     core_str_view_t val = {.len = 1}; /* deliberately wrong: overwritten with 0 */
@@ -589,9 +597,32 @@ UTEST(cookie, finds_first_pair) {
     ASSERT_EQ((size_t)4, val.len);
     ASSERT_EQ(0, strncmp("dark", val.data, val.len));
 }
+UTEST(headers, content_length_overflow_rejected) {
+    /* 2^64 - 6 wraps to 14 without an overflow guard */
+    const core_str_view_t req =
+        CORE_SV("POST /x HTTP/1.1\r\nContent-Length: 18446744073709551630\r\n\r\n");
+    size_t len = 0;
+    ASSERT_EQ(-1, core_http_content_length(req, &len));
+}
+
+UTEST(headers, body_line_is_not_a_header) {
+    /* a header-shaped line after the blank line is body, never a header */
+    const core_str_view_t req = CORE_SV("POST /x HTTP/1.1\r\n\r\nContent-Length: 5\r\n");
+    size_t len = 77;
+    ASSERT_EQ(-1, core_http_content_length(req, &len));
+}
+
+UTEST(cookie, body_cookie_line_ignored) {
+    const core_str_view_t req = CORE_SV("GET / HTTP/1.1\r\n\r\nCookie: app_session=zz\r\n");
+    core_str_view_t val = {0};
+    ASSERT_EQ(0, core_http_cookie(req, "app_session", &val));
+}
+
 UTEST(cookie, absent) {
+    core_str_view_t val = {.len = 9}; /* sentinel: absent must not touch */
     ASSERT_EQ(0, core_http_cookie(CORE_SV_BUF(POST_FORM_REQUEST, strlen(POST_FORM_REQUEST)),
-                                  "other", NULL));
+                                  "other", &val));
+    ASSERT_EQ((size_t)9, val.len);
 }
 UTEST(cookie, spaces_trimmed) {
     core_str_view_t val = {0};
@@ -661,6 +692,9 @@ UTEST(form, absent_and_empty) {
     ASSERT_EQ(1, core_http_form_field(CORE_SV("password="), "password", &val));
     ASSERT_EQ((size_t)0, val.len);
     ASSERT_EQ(0, core_http_form_field(CORE_SV("password="), "other", NULL));
+    core_str_view_t none = {.len = 5}; /* sentinel: absent must not touch */
+    ASSERT_EQ(0, core_http_form_field(CORE_SV("password="), "other", &none));
+    ASSERT_EQ((size_t)5, none.len);
 }
 UTEST(form, encoded_left_as_is) {
     core_str_view_t val = {0};

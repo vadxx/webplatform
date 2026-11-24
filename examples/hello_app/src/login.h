@@ -12,6 +12,9 @@ struct db;
  * app_session cookie; logout closes and deletes it. The db pointer is
  * optional: without it login still works, sessions just do not persist. */
 
+/* The app_session cookie name: one source for the gate and the handlers */
+extern const char app_cookie_name[];
+
 enum { APP_SESSION_TTL_SEC = 86400 };
 
 /* Configures the expected password (pointer is remembered, not copied:

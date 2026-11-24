@@ -91,9 +91,11 @@ UTEST(login, valid_password_opens_session_and_redirects) {
     conn_reset();
     ASSERT_EQ(0, app_login_serve(&g_conn));
     ASSERT_NE(NULL, strstr(g_conn.resp.head, core_http_status_redirect));
-    ASSERT_NE(NULL, strstr(g_conn.resp.head, "Location: /"));
+    ASSERT_NE(NULL, strstr(g_conn.resp.head, "Location: /\r\n"));
     ASSERT_EQ(1, cookie_token(g_conn.resp.head, token));
     ASSERT_EQ(1, core_session_valid(token, strlen(token)));
+    /* cookie flags live in the app layer: SameSite rides along */
+    ASSERT_NE(NULL, strstr(g_conn.resp.head, "SameSite=Lax"));
     /* the store holds the session (write-through) */
     struct count_sink_login sink = {0};
     ASSERT_EQ(0, db_query(&db, "SELECT token FROM sessions", count_row_for_login, &sink));
@@ -101,6 +103,8 @@ UTEST(login, valid_password_opens_session_and_redirects) {
     /* Set-Cookie insertion is reflected in lengths (Review Focus 2) */
     ASSERT_EQ(strlen(g_conn.resp.head), g_conn.resp.head_len);
     ASSERT_EQ(g_conn.resp.head_len, g_conn.resp.iov[0].iov_len);
+    /* the loop cuts the connection by total_len: it must count the line */
+    ASSERT_EQ(g_conn.resp.head_len, g_conn.resp.total_len);
     ASSERT_EQ(0, db_close(&db));
 }
 
@@ -147,6 +151,7 @@ UTEST(login, logout_closes_session_and_sweeps_store) {
     ASSERT_EQ(0, core_session_valid(token, strlen(token)));
     ASSERT_NE(NULL, strstr(g_conn.resp.head, "Location: /login"));
     ASSERT_NE(NULL, strstr(g_conn.resp.head, "Max-Age=0"));
+    ASSERT_EQ(strlen(g_conn.resp.head), g_conn.resp.total_len);
     struct count_sink_login sink = {0};
     ASSERT_EQ(0, db_query(&db, "SELECT token FROM sessions", count_row_for_login, &sink));
     ASSERT_EQ(0, sink.count);
@@ -174,6 +179,7 @@ UTEST(login, relogin_replaces_previous_session) {
     ASSERT_EQ(1, cookie_token(g_conn.resp.head, token2));
     ASSERT_EQ(0, core_session_valid(token1, strlen(token1)));
     ASSERT_EQ(1, core_session_valid(token2, strlen(token2)));
+    ASSERT_EQ(strlen(g_conn.resp.head), g_conn.resp.total_len);
     /* the old row is deleted, the new one is stored: one row total */
     struct count_sink_login sink = {0};
     ASSERT_EQ(0, db_query(&db, "SELECT token FROM sessions", count_row_for_login, &sink));
@@ -200,9 +206,11 @@ UTEST(login, null_db_login_still_works_in_memory) {
     app_login_set_db(NULL);
     g_body = "password=s3cret";
     conn_reset();
+    g_malloc_calls = 0; /* delta: only the serve call is counted */
     ASSERT_EQ(0, app_login_serve(&g_conn));
     ASSERT_NE(NULL, strstr(g_conn.resp.head, "Location: /"));
     ASSERT_NE(NULL, strstr(g_conn.resp.head, COOKIE_PREFIX));
+    ASSERT_EQ(0, g_malloc_calls);
 }
 
 UTEST_MAIN();
