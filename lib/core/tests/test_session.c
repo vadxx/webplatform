@@ -13,9 +13,7 @@ __attribute__((visibility("default"))) void *__wrap_malloc(size_t size) {
 }
 
 /* Tests share one process and one registry: start from a clean table */
-static void registry_clear(void) {
-    memset(g_slots, 0, sizeof(g_slots));
-}
+static void registry_clear(void) { memset(g_slots, 0, sizeof(g_slots)); }
 
 UTEST(session, open_mints_distinct_tokens) {
     registry_clear();
@@ -89,6 +87,47 @@ UTEST(session, module_is_zero_heap) {
     ASSERT_EQ(1, core_session_valid(token, strlen(token)));
     core_session_close(token, strlen(token));
     ASSERT_EQ(0, g_malloc_calls);
+}
+
+UTEST(restore, known_token_becomes_valid) {
+    registry_clear();
+    const char token[] = "0123456789abcdef0123456789abcdef";
+    ASSERT_EQ(1, core_session_restore(token, strlen(token), 3600));
+    ASSERT_EQ(1, core_session_valid(token, strlen(token)));
+}
+
+UTEST(restore, duplicate_refreshes_ttl) {
+    registry_clear();
+    const char token[] = "0123456789abcdef0123456789abcdef";
+    ASSERT_EQ(1, core_session_restore(token, strlen(token), 0)); /* dead on arrival */
+    ASSERT_EQ(0, core_session_valid(token, strlen(token)));
+    ASSERT_EQ(1, core_session_restore(token, strlen(token), 3600)); /* re-hydrate refreshes */
+    ASSERT_EQ(1, core_session_valid(token, strlen(token)));
+}
+
+UTEST(restore, wrong_length_rejected) {
+    registry_clear();
+    const char short_tok[] = "0123456789abcdef0123456789abcde";
+    ASSERT_EQ(0, core_session_restore(short_tok, strlen(short_tok), 3600));
+    /* nothing was registered */
+    ASSERT_EQ(0, core_session_valid(short_tok, strlen(short_tok)));
+}
+
+UTEST(restore, full_table_rejected) {
+    registry_clear();
+    char tokens[CORE_SESSION_MAX][CORE_SESSION_TOKEN_LEN + 1];
+    for (int i = 0; i < CORE_SESSION_MAX; ++i) {
+        ASSERT_NE(NULL, core_session_open(3600, tokens[i]));
+    }
+    const char token[] = "fedcba9876543210fedcba9876543210";
+    ASSERT_EQ(0, core_session_restore(token, strlen(token), 3600));
+}
+
+UTEST(restore, expires_with_ttl) {
+    registry_clear();
+    const char token[] = "0123456789abcdef0123456789abcdef";
+    ASSERT_EQ(1, core_session_restore(token, strlen(token), 0));
+    ASSERT_EQ(0, core_session_valid(token, strlen(token)));
 }
 
 UTEST_MAIN();

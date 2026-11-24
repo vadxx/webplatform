@@ -17,7 +17,10 @@ static const char DB_SCHEMA[] = "CREATE TABLE IF NOT EXISTS metrics ("
                                 "ts INTEGER PRIMARY KEY,"
                                 "cpu_busy REAL NOT NULL,"
                                 "mem_kb INTEGER NOT NULL,"
-                                "load1 REAL NOT NULL)";
+                                "load1 REAL NOT NULL);"
+                                "CREATE TABLE IF NOT EXISTS sessions ("
+                                "token TEXT PRIMARY KEY,"
+                                "expires_at INTEGER NOT NULL)";
 
 /* Pragmas: the page cache must fit the static arena with room to spare.
  * Under memsys5 every allocation rounds up to a power of two, so a

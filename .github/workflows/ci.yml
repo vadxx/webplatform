@@ -68,3 +68,20 @@ jobs:
           docker exec smoke curl -sf 'localhost:8080/api/metrics?range=abc' | grep -q '"cpu":\['
           docker exec smoke curl -sf --compressed localhost:8080/ | grep -q "metrics-chart"
           docker exec smoke curl -sf --compressed localhost:8080/uplot.iife.min.js | grep -q uPlot
+      - name: E2E hello_app check
+        run: |
+          docker exec smoke pkill hello_server
+          sleep 1
+          docker exec -d -w /data/work/repo smoke build/examples/hello_app/src/hello_app
+          sleep 1
+          docker exec smoke sh -c 'curl -si localhost:8080/ | grep -q "302 Found"'
+          docker exec smoke sh -c 'curl -si localhost:8080/ | grep -q "Location: /login"'
+          docker exec smoke sh -c 'curl -si localhost:8080/api/logs | grep -q "401 Unauthorized"'
+          docker exec smoke curl -sf -c /tmp/jar -d password=admin localhost:8080/login -o /dev/null
+          docker exec smoke curl -sf --compressed -b /tmp/jar localhost:8080/ | grep -q log-lines
+          docker exec smoke curl -sf -b /tmp/jar localhost:8080/api/logs | grep -q '"lines"'
+          # persistence: restart keeps the session
+          docker exec smoke pkill hello_app
+          docker exec -d -w /data/work/repo smoke build/examples/hello_app/src/hello_app
+          sleep 1
+          docker exec smoke curl -sf --compressed -b /tmp/jar localhost:8080/ | grep -q log-lines

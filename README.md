@@ -53,6 +53,8 @@ Containerfile.
   loaded via `dlopen` with a `host_api_t`.
 - [examples/server](examples/hello_server/) - a vertical slice: HTTP request ->
   route -> plugin -> `writev` -> embedded HTMX page.
+- [examples/app](examples/hello_app/) - the app pattern: login gate,
+  dashboard, SQLite-backed sessions.
 
 ```bash
 # inside the container, repo synced to /data/work/webplatform

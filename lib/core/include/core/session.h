@@ -22,3 +22,9 @@ int core_session_valid(const char *token, size_t token_len);
 
 /* Drops the session (logout); unknown tokens are ignored. */
 void core_session_close(const char *token, size_t token_len);
+
+/* Registers a caller-known token (hydration from a persistent store):
+ * copies it into a free slot with the given TTL. 1 ok, 0 when the table
+ * is full (expired entries are reaped first) or token_len does not equal
+ * CORE_SESSION_TOKEN_LEN. A token already live refreshes its TTL. */
+int core_session_restore(const char *token, size_t token_len, int ttl_sec);

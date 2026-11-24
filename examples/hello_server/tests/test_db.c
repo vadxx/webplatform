@@ -67,6 +67,18 @@ UTEST(db, schema_created_by_open) {
     ASSERT_EQ(0, db_close(&db));
 }
 
+UTEST(db, sessions_table_created_by_open) {
+    struct db db;
+    struct row_sink sink;
+    memset(&sink, 0, sizeof(sink));
+    ASSERT_EQ(0, db_open(&db, ":memory:"));
+    ASSERT_EQ(0,
+              db_query(&db, "SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'",
+                       capture_row, &sink));
+    ASSERT_EQ(1, sink.count);
+    ASSERT_EQ(0, db_close(&db));
+}
+
 UTEST(db, exec_bad_sql_fails) {
     struct db db;
     ASSERT_EQ(0, db_open(&db, ":memory:"));
@@ -110,7 +122,8 @@ UTEST(db, soak_day_of_inserts) {
     remove(path);
     ASSERT_EQ(0, db_open(&db, path));
     for (int i = 0; i < SOAK_ROWS; ++i) {
-        snprintf(sql, sizeof(sql), "INSERT INTO metrics VALUES (%d, 12.5, 812340, 0.42)", 1700000000 + i);
+        snprintf(sql, sizeof(sql), "INSERT INTO metrics VALUES (%d, 12.5, 812340, 0.42)",
+                 1700000000 + i);
         ASSERT_EQ(0, db_exec(&db, sql));
         if ((i + 1) % SOAK_DELETE_STEP == 0) {
             const int keep_from = 1700000000 + i + 1 - SOAK_DELETE_KEEP;

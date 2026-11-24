@@ -1,2 +1,3 @@
 add_subdirectory(hello_plugin)
 add_subdirectory(hello_server)
+add_subdirectory(hello_app)

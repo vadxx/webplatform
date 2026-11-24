@@ -13,9 +13,7 @@ struct core_session_slot {
 
 static struct core_session_slot g_slots[CORE_SESSION_MAX];
 
-static long long now_sec(void) {
-    return (long long)time(NULL);
-}
+static long long now_sec(void) { return (long long)time(NULL); }
 
 /* Drops expired entries; called on every open/valid. */
 static void reap_expired(long long now) {
@@ -46,19 +44,23 @@ static void bytes_to_hex(const unsigned char *bytes, size_t len, char *out) {
     out[2 * len] = '\0';
 }
 
+/* First free slot, NULL when the table is full. */
+static struct core_session_slot *free_slot(void) {
+    for (int i = 0; i < CORE_SESSION_MAX; ++i) {
+        if (g_slots[i].expires == 0) {
+            return &g_slots[i];
+        }
+    }
+    return NULL;
+}
+
 const char *core_session_open(int ttl_sec, char out_token[CORE_SESSION_TOKEN_LEN + 1]) {
     if (out_token == NULL || ttl_sec < 0) {
         return NULL;
     }
     const long long now = now_sec();
     reap_expired(now);
-    struct core_session_slot *slot = NULL;
-    for (int i = 0; i < CORE_SESSION_MAX; ++i) {
-        if (g_slots[i].expires == 0) {
-            slot = &g_slots[i];
-            break;
-        }
-    }
+    struct core_session_slot *slot = free_slot();
     if (slot == NULL) {
         return NULL; /* table full of live sessions */
     }
@@ -97,4 +99,23 @@ void core_session_close(const char *token, size_t token_len) {
         /* the registry owns the slots: drop through the const view */
         g_slots[found - g_slots].expires = 0;
     }
+}
+
+int core_session_restore(const char *token, size_t token_len, int ttl_sec) {
+    if (token == NULL || ttl_sec < 0 || token_len != CORE_SESSION_TOKEN_LEN) {
+        return 0;
+    }
+    const long long now = now_sec();
+    reap_expired(now);
+    struct core_session_slot *slot = (struct core_session_slot *)slot_by_token(token, token_len);
+    if (slot == NULL) {
+        slot = free_slot();
+    }
+    if (slot == NULL) {
+        return 0; /* table full of live sessions */
+    }
+    memcpy(slot->token, token, token_len);
+    slot->token[token_len] = '\0';
+    slot->expires = now + ttl_sec;
+    return 1;
 }
