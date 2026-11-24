@@ -6,6 +6,16 @@ BUILD_DIR="build"
 # Project sources: tracked files only; everything vendored in third-party/ is untouched
 mapfile -t sources < <(git ls-files '*.c' '*.cpp' '*.h' '*.hpp' | grep -v '^third-party/')
 
+# The gate only sees tracked files (CI validates the committed tree):
+# new sources that were never `git add`ed would skip format and tidy.
+mapfile -t orphans < <(git ls-files --others --exclude-standard -- '*.c' '*.cpp' '*.h' '*.hpp' \
+    | grep -v '^third-party/' || true)
+if ((${#orphans[@]})); then
+    echo "ERROR: untracked C/C++ sources would skip the gate (git add them first):"
+    printf '  %s\n' "${orphans[@]}"
+    exit 1
+fi
+
 echo "=== 1. Formatting ==="
 if ((${#sources[@]})); then
     clang-format -i "${sources[@]}"
